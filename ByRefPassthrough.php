@@ -93,7 +93,7 @@ class ByRefPassthrough
    */
   public function doWorkUsingStack()
   {
-    $stack = debug_backtrace(0);
+    $stack = debug_backtrace(0, 1);
     return call_user_func_array($this->callback, $stack[0]['args']);
   }
 
@@ -104,10 +104,14 @@ class ByRefPassthrough
    */
   public function doWorkUsingReflectionWithStack()
   {
-    $stack = debug_backtrace(0);
+    $stack = debug_backtrace(0, 1);
 
     $reflection = $this->getReflection();
-    return ($reflection instanceof ReflectionFunction ? $reflection->invokeArgs($stack[0]['args']) : $reflection->invokeArgs($this->callback[0], $stack[0]['args']));
+    $result = ($reflection instanceof ReflectionFunction ? $reflection->invokeArgs($stack[0]['args']) : $reflection->invokeArgs($this->callback[0], $stack[0]['args']));
+
+    var_dump($stack[0]['args']);
+
+    return $result;
   }
 
   /**
@@ -141,7 +145,7 @@ class ByRefPassthrough
    */
   public function doWorkUsingStackAndMagic(&$arg0 = null, &$arg1 = null, &$arg2 = null)
   {
-    $stack = debug_backtrace(0);
+    $stack = debug_backtrace(0, 1);
     return call_user_func_array($this->callback, $stack[0]['args']);
   }
 
@@ -153,7 +157,9 @@ class ByRefPassthrough
    */
   public function doWorkUsingReflectionStackAndMagic(&$arg0 = null, &$arg1 = null, &$arg2 = null)
   {
-    $stack = debug_backtrace(0);
+    $stack = debug_backtrace(0, 1);
+
+    debug_zval_dump($stack[0]['args']);
 
     $reflection = $this->getReflection();
     return ($reflection instanceof ReflectionFunction ? $reflection->invokeArgs($stack[0]['args']) : $reflection->invokeArgs($this->callback[0], $stack[0]['args']));

@@ -350,5 +350,33 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
     $this->assertEquals('two', $var2);
   }
 
+  /**
+   * @test
+   */
+  // public function testDoWorkUsingMagicWithTerminals()
+  // {
+  //   $callback = static::$closure;
+
+  //   $obj = new ByRefPassthrough($callback);
+
+  //   $result = $obj->doWorkWithMagic(1, 2);
+
+  //   $this->assertEquals('12', $result);
+  // }
+
+  /**
+   * @test
+   */
+  // public function testDoWorkUsingMagicWithReturnedValue()
+  // {
+  //   $callback = static::$closure;
+
+  //   $obj = new ByRefPassthrough($callback);
+
+  //   $result = $obj->doWorkUsingStackAndMagic(strrev('one'), strrev('two'));
+
+  //   $this->assertEquals('enoowt', $result);
+  // }
+
 
 }
