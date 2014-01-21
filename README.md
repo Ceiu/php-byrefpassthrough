@@ -77,11 +77,11 @@ array(2) refcount(2) {
 If we can't address that, there's no hope at all. Fortunately, there's a handy workaround: ```debug_backtrace```. Using debug_backtrace, we can get the arguments as they were presented to the callee:
 
 ```php
-$stack = debug_backtrace(0, 0);
+$stack = debug_backtrace(0, 1);
 $args = $stack[0]['args'];
 ```
 
-```debug_backtrace``` returns all sorts of information about each call, so it's not exactly the most efficient tool in PHP. We can somewhat mitigate the performance hit by not including the objects and limiting the returned stack trace to one frame by passing 0 for the limit.
+```debug_backtrace``` returns all sorts of information about each call, so it's not exactly the most efficient tool in PHP. We can somewhat mitigate the performance hit by not including the objects and limiting the returned stack trace to one frame by passing 1 for the limit.
 
 Once we have our frame, we can pull out the arguments array. Give it another run and you should see this:
 
