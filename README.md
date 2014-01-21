@@ -128,7 +128,13 @@ Notice that, while we passed ```$var2``` to the passthrough by-reference, it was
 You may have also noticed that our zval dump, annoyingly, didn't change as one may have expected (grumble grumble...). The implication here is that PHP's pass-by-reference mechanics are not implemented by sharing zvals. Though, as I stated above, I've not dug back in to verify this -- it's simply my best guess given known, repeatable behavior and data.
 
 
-Anyway, the only real drawback to this hack is that each parameter must be explicitly listed to be passed by-ref. With the final signature on doWork, we could pass 100 parameters, but only the first three will be recognized as references. Also, it's incredibly ugly and convoluting to add a bunch of parameters because something *might* need them in the future. 
+Anyway, ~~the only real~~ one drawback to this hack is that each parameter must be explicitly listed to be passed by-ref. With the final signature on doWork, we could pass 100 parameters, but only the first three will be recognized as references. Also, it's incredibly ugly and convoluting to add a bunch of parameters because something *might* need them in the future. **The biggest drawback, however, is that you can no longer use terminals in the call to the passthrough, and using expressions results in a strict-standards warning:**
+
+```php
+$result = doWork(1, 2); // Fatal error
+
+$result = doWork(strrev('hello'), strrev('dolly')); // Strict standards warning.
+```
 
 In any event, this entire problem will likely be resolved by the addition of variadic functions, whenever that rolls out. Until then, we have this ugly hack to workaround this issue and do those things the PHP manual tells us not to do anyway.
 
