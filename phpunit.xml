@@ -1,0 +1,8 @@
+<phpunit bootstrap="bootstrap.php">
+  <testsuites>
+    <testsuite name="ByRefPassthrough">
+      <directory suffix="Test.php">./Test</directory>
+    </testsuite>
+  </testsuites>
+</phpunit>
+

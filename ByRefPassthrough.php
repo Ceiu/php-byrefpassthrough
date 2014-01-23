@@ -100,7 +100,7 @@ abstract class ByRefPassthrough
 
     $rtype = $reflection->returnsReference() ? 'R' : 'V';
 
-    $class = "Cericlabs\\Misc\\ByRefPassthrough_{$rtype}" . bin2hex($plist);
+    $class = __CLASS__ . "_{$rtype}" . bin2hex($plist);
 
     return new $class($callback);
   }
@@ -234,11 +234,12 @@ $result = spl_autoload_register(function($class) {
   //  0 - Entire match
   //  1 - Namespace
   //  2 - Unqualified class name
-  //  3 - Return type (reference or value)
-  //  4 - Encoded parameter list
-  if (preg_match('/\\A(Cericlabs\\\\Misc)\\\\(ByRefPassthrough_(R|V)([A-Za-z0-9+\\/]*))\\z/', $class, $matches)) {
-    // First, pull the param list out of the classname.
-    $plist = pack("H*", $matches[4]);
+  //  3 - The base class name (ByRefPassthrough, in this case)
+  //  4 - Return type (reference or value)
+  //  5 - Encoded parameter list
+  if (preg_match('/\\A(Cericlabs\\\\Misc)\\\\((ByRefPassthrough)_(R|V)([A-Za-z0-9+\\/]*))\\z/', $class, $matches)) {
+    // First, pull the param list out of the classname and decode it.
+    $plist = pack("H*", $matches[5]);
 
     // Next, we build our dynamic subclass using the param list.
     // Note:
@@ -247,7 +248,7 @@ $result = spl_autoload_register(function($class) {
     // parameter list and calling eval from within the to-be-eval'd string below.
     $subclass = sprintf(
       'namespace %s {
-        class %s extends ByRefPassthrough {
+        class %s extends %s {
           public function %s__invoke(%s) {
             $stack = debug_backtrace(0);
 
@@ -259,7 +260,7 @@ $result = spl_autoload_register(function($class) {
         }
       }',
 
-      $matches[1], $matches[2], ($matches[3] === 'R' ? '&' : ''), $plist
+      $matches[1], $matches[2], $matches[3], ($matches[4] === 'R' ? '&' : ''), $plist
     );
 
     // Eval!
