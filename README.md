@@ -136,6 +136,179 @@ $result = doWork(1, 2); // Fatal error
 $result = doWork(strrev('hello'), strrev('dolly')); // Strict standards warning.
 ```
 
-In any event, this entire problem will likely be resolved by the addition of variadic functions, whenever that rolls out. Until then, we have this ugly hack to workaround this issue and do those things the PHP manual tells us not to do anyway.
+This may be a dealbreaker for some, but if you're feeling particularly sadistic, there may be a workaround for you.
+
+
+Dynamically generating method signatures
+========================================
+
+In certain cases, it may be possible to (mis)use some PHP implementation details to work around the
+method signature issue and generate it on the fly. This, of course, comes with its own overhead and
+limitations, so it definitely won't be applicable everywhere.
+
+Requirements:
+* The class which requires the dynamic method must be created by a factory.
+* The callback must be passed to the factory's build method/function.
+* The callback must be (mostly) immutable.
+* eval must be available.
+* Your project/team must allow flexibility when it comes to code sanity. This is not pretty.
+
+If any of these present a problem, this workaround will likely cause more problems than it solves. If not, read on.
+
+The trick we'll be using is to generate a subclass of our desired class which contains the method with the desired signature *per callback*. By parsing the callback upon object construction, we can generate a dynamic class name containing the method signature. This allows us to reuse the class and even serialize/unserialize it later.
+
+
+The components
+--------------
+* The afore mentioned required factory function
+* A classloader
+* A bottle of your favorite alcoholic beverage
+
+
+The first component in this unholy hack is the factory function which will generate subclasses with our desired method. You can use any factory pattern with which you're comfortable, but we'll be using a static function in our example. As stated above, the factory must receive the callback to execute as it builds the new object. Once the object is built, we'd need to dive into the symbol table to make any changes (which is not only a bad idea, but not possible from user land).
+
+With the callback, we can use PHP's reflection classes to figure out what the callback is expecting for input. Unfortunately, we have to do some fairly tedious work to translate the information from the reflection object back to PHP code.
+
+```php
+  public static final function newInstance(callable $callback)
+  {
+    // Get a ReflectionMethod or ReflectionFunction, depending on the source
+    // of our callback.
+    if (is_array($callback) && count($callback) === 2) {
+      $rc = new ReflectionClass($callback[0]);
+      $reflection = $rc->getMethod($callback[1]);
+    } else {
+      $reflection = new ReflectionFunction($callback);
+    }
+
+    $plist = '';
+    $pcount = 0;
+    
+    // Process the parameter list...
+    foreach ($reflection->getParameters() as $param) {
+      if ($pcount++) {
+        $plist .= ', ';
+      }
+
+      // Typehinting
+      if ($param->isArray()) {
+        $plist .= 'array ';
+      } else if ($param->isCallable()) {
+        $plist .= 'callable ';
+      } else if ($rc = $param->getClass()) {
+        // We need to add a leading slash here to ensure PHP
+        // processes it as an absolute class name.
+        $plist .= '\\' . $rc->getName() . ' ';
+      }
+
+      // By-ref
+      if ($param->isPassedByReference()) {
+        $plist .= '&';
+      }
+
+      // Name
+      $plist .= '$' . $param->getName();
+
+      // Default value
+      if ($param->isDefaultValueAvailable()) {
+        $value = $param->getDefaultValue();
+
+        if (is_string($value)) {
+          $value = '\'' . addslashes($value) . '\'';
+        }
+
+        $plist .= ' = ' . ($value ? (string) $value : 'null');
+      }
+    }
+    
+    // Is the callback going to give us a reference?
+    $rtype = $reflection->returnsReference() ? 'R' : 'V';
+    
+    // Build the name for our dynamic class.
+    // We use bin2hex here to encode away invalid characters.
+    $class = __CLASS__ . "_{$rtype}" . bin2hex($plist);
+    
+    // Instantiate! This will likely cause our class to be loaded.
+    return new $class($callback);
+  }
+```
+
+Yuck. There are likely better ways to do this, but the goal here is to produce the parameter list and then encode it into the new classname. What we have above will generate names in the form of: 
+
+  <FullyQualifiedClassName>_<ReturnType><EncodedParameterList>
+  
+Where:
+* <FullyQualifiedClassName> is exactly what it says on the tin: The fully qualified class name. If your class is in the namespace A\B and is named Foo, this will be A\B\Foo.
+* <ReturnType> is a single character representing the type (reference or value) of value the callback is going to return. If it returns by-reference, this will be an R. Otherwise, it's a V.
+* <EncodedParameterList> is a lengthy hexadecimal string containing the encoded parameter list.
+
+
+Now, as I'm sure you've noticed, that last line will cause our goofy-looking class to be loaded immediately. At this point, we need a classloader that can process that mess. This actually isn't as bad as it sounds. Since we know what class we'll be looking for, we can use a regular expression to parse out everything we need:
+
+```php
+$result = spl_autoload_register(function($class) {
+
+  // Check if the class matches our expression. This example expects the class to be in the
+  // "Cericlabs\Misc" namespace with a base name of "ByRefPassthrough", so you'll likely
+  // need to change it accordingly.
+  //
+  // Grouping:
+  //  0 - Entire match
+  //  1 - Namespace
+  //  2 - Unqualified class name
+  //  3 - The base class name (ByRefPassthrough, in this case)
+  //  4 - Return type (reference or value)
+  //  5 - Encoded parameter list
+  if (preg_match('/\\A(Cericlabs\\\\Misc)\\\\((ByRefPassthrough)_(R|V)([A-Za-z0-9+\\/]*))\\z/', $class, $matches)) {
+    // First, pull the param list out of the classname and decode it.
+    $plist = pack("H*", $matches[5]);
+
+    // Next, we build our dynamic subclass using the param list.
+    // Note:
+    // This currently does not support passing through values returned by reference. I may add it
+    // as time permits; but if you're impatient, a solution that can work involves rebuilding the
+    // parameter list and calling eval from within the to-be-eval'd string below.
+    $subclass = sprintf(
+      'namespace %s {
+        class %s extends %s {
+          public function %s__invoke(%s) {
+            $stack = debug_backtrace(0);
+
+            $reflection = static::getReflection($this->callback);
+            $result = ($reflection instanceof \\ReflectionFunction ? $reflection->invokeArgs($stack[0][\'args\']) : $reflection->invokeArgs($this->callback[0], $stack[0][\'args\']));
+
+            return $result;
+          }
+        }
+      }',
+
+      $matches[1], $matches[2], $matches[3], ($matches[4] === 'R' ? '&' : ''), $plist
+    );
+
+    // Eval!
+    eval($subclass);
+
+    // At this point, the subclass should be defined properly and should be able to act as a
+    // transparent passthrough.
+  }
+}, true, true);
+```
+
+This classloader attempts to generate classes for anything matching the form we've defined above. Either of these can change, so long as the factory generates names the classloader is expecting to see. The key here is that the encoded parameter list is part of the classname and can be parsed easily. This bit is crucial if we want to be able to recover or regenerate the class after unserializing or some such thing.
+
+In this case, we're generating the parameter list for the __invoke method. The actual method name, and its contents, are of no consequence here -- they're simply what we're generating for this particular implementation/example. Each project will require its own method(s) and code here.
+
+Anyway, with these two in place, we end up with a method that has a signature matching that of our callbacks. Passing in values by-ref and by-value will work as expect *and* we can use literals and variables as we'd expect to. Glorious.
+
+The only hiccup remaining is return by-ref. Currently, all of PHP's call forwarding functionality returns the result by-value, which gives us the same problem with far fewer avenues of attack. There is a way to deal with it by generating code for the reflected call into a string and ```eval```ing it, but that seems a bit much -- even for me. I'm drawing the line at recursive ```eval```s and leaving that as an exercise for those who truly need it.
+
+
+Final Thoughts
+--------------
+I know I've been saying it and hinting at it a lot through this readme, but I feel it can't be said enough: This is a hack; and one to workaround something that only affects a handful of edge cases. The complexity and overhead associated with this is probably not worth it if you're in a position to refactor the codebase to simply not be passing values by-ref through to callbacks and closures.
+
+Additionally, I had to resist the temptation to demo this workaround using features found in vanilla PHP. There are several libraries and frameworks which resolve this problem in much cleaner ways or give it much higher usability potential. In particular, [nikic](https://github.com/nikic)'s [PHPParser](https://github.com/nikic/PHP-Parser) would likely clean up a lot of the code generation I'm doing in the classloader and may improve the parameter scanner as well. My own project, [Gustavus Temporary Overrides](https://github.com/Gustavus/php-gto), could also be used in concert with the dynamic class generation to do method replacement by injecting the callback into the class's symbol table directly. 
+
+In any event, PHP doesn't make this an easy task. Hopefully in the future they'll improve the whole by-ref passing/returning thing, or, at the very least, improve the reflection and forwarding tools to allow these things to be done with far fewer headaches. In the meantime, we are left evaluating whether or not by-ref passthrough of non-objects is worth enough the trouble required by these workarounds.
 
 -C
