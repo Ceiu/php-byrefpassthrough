@@ -235,12 +235,12 @@ With the callback, we can use PHP's reflection classes to figure out what the ca
 
 Yuck. There are likely better ways to do this, but the goal here is to produce the parameter list and then encode it into the new classname. What we have above will generate names in the form of: 
 
-  <FullyQualifiedClassName>_<ReturnType><EncodedParameterList>
+    <FullyQualifiedClassName>_<ReturnType><EncodedParameterList>
   
 Where:
-* <FullyQualifiedClassName> is exactly what it says on the tin: The fully qualified class name. If your class is in the namespace A\B and is named Foo, this will be A\B\Foo.
-* <ReturnType> is a single character representing the type (reference or value) of value the callback is going to return. If it returns by-reference, this will be an R. Otherwise, it's a V.
-* <EncodedParameterList> is a lengthy hexadecimal string containing the encoded parameter list.
+* &lt;FullyQualifiedClassName&gt; is exactly what it says on the tin: The fully qualified class name. If your class is in the namespace A\B and is named Foo, this will be A\B\Foo.
+* &lt;ReturnType&gt; is a single character representing the type (reference or value) of value the callback is going to return. If it returns by-reference, this will be an R. Otherwise, it's a V.
+* &lt;EncodedParameterList&gt; is a lengthy hexadecimal string containing the encoded parameter list.
 
 
 Now, as I'm sure you've noticed, that last line will cause our goofy-looking class to be loaded immediately. At this point, we need a classloader that can process that mess. This actually isn't as bad as it sounds. Since we know what class we'll be looking for, we can use a regular expression to parse out everything we need:
@@ -296,7 +296,7 @@ $result = spl_autoload_register(function($class) {
 
 This classloader attempts to generate classes for anything matching the form we've defined above. Either of these can change, so long as the factory generates names the classloader is expecting to see. The key here is that the encoded parameter list is part of the classname and can be parsed easily. This bit is crucial if we want to be able to recover or regenerate the class after unserializing or some such thing.
 
-In this case, we're generating the parameter list for the __invoke method. The actual method name, and its contents, are of no consequence here -- they're simply what we're generating for this particular implementation/example. Each project will require its own method(s) and code here.
+In this case, we're generating the parameter list for the ```__invoke``` method. The actual method name, and its contents, are of no consequence here -- they're simply what we're generating for this particular implementation/example. Each project will require its own method(s) and code here.
 
 Anyway, with these two in place, we end up with a method that has a signature matching that of our callbacks. Passing in values by-ref and by-value will work as expect *and* we can use literals and variables as we'd expect to. Glorious.
 
