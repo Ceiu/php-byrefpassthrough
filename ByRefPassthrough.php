@@ -27,24 +27,82 @@ use ReflectionClass,
  *
  * @author Chris "Ceiu" Rog <crog@gustavus.edu>
  */
-class ByRefPassthrough
+abstract class ByRefPassthrough
 {
   /**
    * The callback to receive our redirected calls.
    *
-   * @var callbakc
+   * @var callback
    */
   protected $callback;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
   /**
-   * Creates a new ByRefPassthrough using the specified
+   * Creates a new ByRefPassthrough using the specified callback. Protected because we don't want
+   * this thing getting allocated directly -- we still have some black magic to do.
    *
+   * @param callable $callback
+   *  The callback to which calls should be redirected.
    */
-  public function __construct(callable $callback)
+  protected function __construct(callable $callback)
   {
     $this->callback = $callback;
+  }
+
+  /**
+   * Creates a new ByRefPassthrough using the specified callback. This function dynamically creates
+   * the necessary subclass for the closure to achieve it's passthrough magic.
+   *
+   * @param callable $callback
+   *  The callback to which calls should be redirected.
+   */
+  public static final function newInstance(callable $callback)
+  {
+    $reflection = static::getReflection($callback);
+
+    $plist = '';
+    $pcount = 0;
+
+    foreach ($reflection->getParameters() as $param) {
+      if ($pcount++) {
+        $plist .= ', ';
+      }
+
+      // Typehinting
+      if ($param->isArray()) {
+        $plist .= 'array ';
+      } else if ($param->isCallable()) {
+        $plist .= 'callable ';
+      } else if ($rc = $param->getClass()) {
+        $plist .= '\\' . $rc->getName() . ' ';
+      }
+
+      // By-ref
+      if ($param->isPassedByReference()) {
+        $plist .= '&';
+      }
+
+      // Name
+      $plist .= '$' . $param->getName();
+
+      // Default value
+      if ($param->isDefaultValueAvailable()) {
+        $value = $param->getDefaultValue();
+
+        if (is_string($value)) {
+          $value = '\'' . addslashes($value) . '\'';
+        }
+
+        $plist .= ' = ' . ($value ? (string) $value : 'null');
+      }
+    }
+
+    $rtype = $reflection->returnsReference() ? 'R' : 'V';
+
+    $class = "Cericlabs\\Misc\\ByRefPassthrough_{$rtype}" . bin2hex($plist);
+
+    return new $class($callback);
   }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,14 +110,14 @@ class ByRefPassthrough
   /**
    * Retrieves an appropriate reflection object for the current callback.
    */
-  protected function getReflection()
+  protected static function getReflection(callable $callback)
   {
-    if (is_array($this->callback)) {
-      $rc = new ReflectionClass($this->callback[0]);
-      return $rc->getMethod($this->callback[1]);
+    if (is_array($callback) && count($callback) === 2) {
+      $rc = new ReflectionClass($callback[0]);
+      return $rc->getMethod($callback[1]);
     }
 
-    return new ReflectionFunction($this->callback);
+    return new ReflectionFunction($callback);
   }
 
 
@@ -81,7 +139,7 @@ class ByRefPassthrough
    */
   public function doWorkUsingReflection()
   {
-    $reflection = $this->getReflection();
+    $reflection = static::getReflection($this->callback);
     return ($reflection instanceof ReflectionFunction ? $reflection->invokeArgs(func_get_args()) : $reflection->invokeArgs($this->callback[0], func_get_args()));
   }
 
@@ -93,7 +151,7 @@ class ByRefPassthrough
    */
   public function doWorkUsingStack()
   {
-    $stack = debug_backtrace(0, 1);
+    $stack = debug_backtrace(0);
     return call_user_func_array($this->callback, $stack[0]['args']);
   }
 
@@ -104,12 +162,10 @@ class ByRefPassthrough
    */
   public function doWorkUsingReflectionWithStack()
   {
-    $stack = debug_backtrace(0, 1);
+    $stack = debug_backtrace(0);
 
-    $reflection = $this->getReflection();
+    $reflection = static::getReflection($this->callback);
     $result = ($reflection instanceof ReflectionFunction ? $reflection->invokeArgs($stack[0]['args']) : $reflection->invokeArgs($this->callback[0], $stack[0]['args']));
-
-    var_dump($stack[0]['args']);
 
     return $result;
   }
@@ -132,7 +188,7 @@ class ByRefPassthrough
    */
   public function doWorkUsingReflectionAndMagic(&$arg0 = null, &$arg1 = null, &$arg2 = null)
   {
-    $reflection = $this->getReflection();
+    $reflection = static::getReflection($this->callback);
     return ($reflection instanceof ReflectionFunction ? $reflection->invokeArgs(func_get_args()) : $reflection->invokeArgs($this->callback[0], func_get_args()));
   }
 
@@ -145,7 +201,7 @@ class ByRefPassthrough
    */
   public function doWorkUsingStackAndMagic(&$arg0 = null, &$arg1 = null, &$arg2 = null)
   {
-    $stack = debug_backtrace(0, 1);
+    $stack = debug_backtrace(0);
     return call_user_func_array($this->callback, $stack[0]['args']);
   }
 
@@ -157,12 +213,59 @@ class ByRefPassthrough
    */
   public function doWorkUsingReflectionStackAndMagic(&$arg0 = null, &$arg1 = null, &$arg2 = null)
   {
-    $stack = debug_backtrace(0, 1);
+    $stack = debug_backtrace(0);
 
-    debug_zval_dump($stack[0]['args']);
-
-    $reflection = $this->getReflection();
+    $reflection = static::getReflection($this->callback);
     return ($reflection instanceof ReflectionFunction ? $reflection->invokeArgs($stack[0]['args']) : $reflection->invokeArgs($this->callback[0], $stack[0]['args']));
   }
 
 }
+
+
+/**
+ * The classloader we use to generate our dynamic classes.
+ */
+$result = spl_autoload_register(function($class) {
+
+  // Check if the class matches our expression. This example only has one dynamic function, so our
+  // expression is setup accordingly. More complex classes will require something even crazier.
+  //
+  // Grouping:
+  //  0 - Entire match
+  //  1 - Namespace
+  //  2 - Unqualified class name
+  //  3 - Return type (reference or value)
+  //  4 - Encoded parameter list
+  if (preg_match('/\\A(Cericlabs\\\\Misc)\\\\(ByRefPassthrough_(R|V)([A-Za-z0-9+\\/]*))\\z/', $class, $matches)) {
+    // First, pull the param list out of the classname.
+    $plist = pack("H*", $matches[4]);
+
+    // Next, we build our dynamic subclass using the param list.
+    // Note:
+    // This currently does not support passing through values returned by reference. I may add it
+    // as time permits; but if you're impatient, a solution that can work involves rebuilding the
+    // parameter list and calling eval from within the to-be-eval'd string below.
+    $subclass = sprintf(
+      'namespace %s {
+        class %s extends ByRefPassthrough {
+          public function %s__invoke(%s) {
+            $stack = debug_backtrace(0);
+
+            $reflection = static::getReflection($this->callback);
+            $result = ($reflection instanceof \\ReflectionFunction ? $reflection->invokeArgs($stack[0][\'args\']) : $reflection->invokeArgs($this->callback[0], $stack[0][\'args\']));
+
+            return $result;
+          }
+        }
+      }',
+
+      $matches[1], $matches[2], ($matches[3] === 'R' ? '&' : ''), $plist
+    );
+
+    // Eval!
+    eval($subclass);
+
+    // At this point, the subclass should be defined properly and should be able to act as a
+    // transparent passthrough.
+  }
+}, true, true);

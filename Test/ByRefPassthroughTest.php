@@ -7,9 +7,7 @@
  *
  * @author Chris "Ceiu" Rog <ceiu@cericlabs.com>
  */
-namespace Cericlabs\Misc;
-
-require_once(__DIR__ . DIRECTORY_SEPARATOR . 'ByRefPassthrough.php');
+namespace Cericlabs\Misc\Test;
 
 use PHPUnit_Framework_TestCase,
     Cericlabs\Misc\ByRefPassthrough;
@@ -31,6 +29,14 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   protected static $closure;
 
   /**
+   * The reference returned by our callbackHandlerWithReference callback.
+   *
+   * @var mixed
+   */
+  protected $reference;
+
+
+  /**
    * Non-closure callback handler. Used during the callback tests.
    */
   public function callbackHandler(&$arg0 = null, $arg1 = null)
@@ -41,6 +47,15 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
     $arg1 = "arg1 @ callback: {$arg1}";
 
     return $comb;
+  }
+
+  /**
+   * Non-closure callback that returns a reference. Used to ensure our magic invoke passes
+   * references through as well.
+   */
+  public function &callbackHandlerWithReference()
+  {
+    return $this->reference;
   }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,9 +82,11 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
    */
   public function testDoWorkWithCallback()
   {
-    $callback = [$this, 'callbackHandler'];
+    //$callback = [$this, 'callbackHandler'];
+    $callback = static::$closure;
+    //$callback = [new \Jeremeamia\SuperClosure\SerializableClosure(function() {}), '__construct'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -87,7 +104,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -105,7 +122,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = [$this, 'callbackHandler'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -123,7 +140,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -141,7 +158,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = [$this, 'callbackHandler'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -159,7 +176,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -177,7 +194,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = [$this, 'callbackHandler'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -195,7 +212,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -213,7 +230,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = [$this, 'callbackHandler'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -231,7 +248,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -249,7 +266,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = [$this, 'callbackHandler'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -267,7 +284,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -285,7 +302,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = [$this, 'callbackHandler'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -303,7 +320,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -321,7 +338,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = [$this, 'callbackHandler'];
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -339,7 +356,7 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
   {
     $callback = static::$closure;
 
-    $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
     $var1 = 'one';
     $var2 = 'two';
 
@@ -350,33 +367,121 @@ class ByRefPassthroughTest extends PHPUnit_Framework_TestCase
     $this->assertEquals('two', $var2);
   }
 
-  /**
-   * @test
-   */
-  // public function testDoWorkUsingMagicWithTerminals()
-  // {
-  //   $callback = static::$closure;
-
-  //   $obj = new ByRefPassthrough($callback);
-
-  //   $result = $obj->doWorkWithMagic(1, 2);
-
-  //   $this->assertEquals('12', $result);
-  // }
 
   /**
    * @test
    */
-  // public function testDoWorkUsingMagicWithReturnedValue()
-  // {
-  //   $callback = static::$closure;
+  public function testMagicInvokeWithCallback()
+  {
+    $callback = [$this, 'callbackHandler'];
 
-  //   $obj = new ByRefPassthrough($callback);
+    $obj = ByRefPassthrough::newInstance($callback);
+    $var1 = 'one';
+    $var2 = 'two';
 
-  //   $result = $obj->doWorkUsingStackAndMagic(strrev('one'), strrev('two'));
+    $result = $obj($var1, $var2);
 
-  //   $this->assertEquals('enoowt', $result);
-  // }
+    $this->assertEquals('onetwo', $result);
+    $this->assertEquals('arg0 @ callback: one', $var1);
+    $this->assertEquals('two', $var2);
+  }
 
+  /**
+   * @test
+   */
+  public function testMagicInvokeWithClosure()
+  {
+    $callback = static::$closure;
+
+    $obj = ByRefPassthrough::newInstance($callback);
+    $var1 = 'one';
+    $var2 = 'two';
+
+    $result = $obj($var1, $var2);
+
+    $this->assertEquals('onetwo', $result);
+    $this->assertEquals('arg0 @ closure: one', $var1);
+    $this->assertEquals('two', $var2);
+  }
+
+  /**
+   * @test
+   */
+  public function testMagicInvokeWithCallbackAndLiterals()
+  {
+    $callback = [$this, 'callbackHandler'];
+
+    $obj = ByRefPassthrough::newInstance($callback);
+    $var1 = 'one';
+
+    $result = $obj($var1, 'two');
+
+    $this->assertEquals('onetwo', $result);
+    $this->assertEquals('arg0 @ callback: one', $var1);
+  }
+
+  /**
+   * @test
+   */
+  public function testMagicInvokeWithClosureAndLiterals()
+  {
+    $callback = static::$closure;
+
+    $obj = ByRefPassthrough::newInstance($callback);
+    $var1 = 'one';
+
+    $result = $obj($var1, 'two');
+
+    $this->assertEquals('onetwo', $result);
+    $this->assertEquals('arg0 @ closure: one', $var1);
+  }
+
+  /**
+   * @test
+   */
+  public function testMagicInvokeWithComplexSignature()
+  {
+    $ref = 'steak';
+    $callback = function(ByRefPassthroughTest $arg0, &$arg1, array $arg2, &$arg3 = '\'bac\\\'on\'', $arg4 = null, $arg5 = '"eggs"') use (&$ref) {
+      $arg1 = 'arg1 @ closure';
+      $arg4 = 'arg4 @ closure';
+
+      return $ref;
+    };
+
+    $obj = ByRefPassthrough::newInstance($callback);
+    $var1 = 'one';
+    $var2 = 'two';
+    $var3 = 'three';
+
+    $result = $obj($this, $var1, [1, 'array', 'literal!'], $var2, $var3);
+
+    $this->assertEquals('steak', $result);
+    $this->assertEquals('arg1 @ closure', $var1);
+    $this->assertEquals('three', $var3);
+  }
+
+  /**
+   * @test
+   */
+  public function testMagicInvokeReturnsReference()
+  {
+    $this->markTestSkipped('This will be enabled once return by-ref support is added.');
+    return;
+
+
+
+    $callback = [$this, 'callbackHandlerWithReference'];
+
+    $obj = ByRefPassthrough::newInstance($callback);
+
+    $this->reference = 'primed';
+    $result =& $obj();
+
+    $this->assertEquals('primed', $result);
+
+    $result = 'changed';
+    $this->assertEquals('changed', $this->reference);
+  }
 
 }
